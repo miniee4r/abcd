@@ -45,13 +45,13 @@ export class AirQualityAdvisor {
     return Boolean(this.apiKey && this.apiKey !== 'your_gemini_api_key_here')
   }
 
-  private getModel() {
+  private getModel(modelName = 'gemini-3.5-flash') {
     if (!this.genAI) {
       if (!this.apiKey) throw new Error('API key not configured')
       this.genAI = new GoogleGenerativeAI(this.apiKey)
     }
     return this.genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: modelName,
       systemInstruction: SYSTEM_PROMPT,
     })
   }

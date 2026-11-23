@@ -146,23 +146,37 @@ const server = http.createServer(async (req, res) => {
           return
         }
 
-        const model = genAI.getGenerativeModel({
-          model: 'gemini-2.5-flash',
-          systemInstruction: SYSTEM_PROMPT,
-        })
-
         const category = currentReading ? `AQI ${currentReading.usAqi}` : 'Current AQI'
         const risks = personaScore?.primaryRisks?.join(', ') || 'general public'
         const housing = persona ? `${persona.housingType}${persona.housingType === 'apartment' ? ` (floor ${persona.floorLevel})` : ''}` : 'general'
         const context = `Conditions: ${category}. Risks: ${risks}. Housing: ${housing}. Vulnerability: ${personaScore?.riskLevel || 'moderate'}.`
         const enrichedMessage = `${context}\n\nUser question: ${message}`
 
-        const cleanHistory = sanitizeHistory(history)
-        const chat = model.startChat({
-          history: cleanHistory,
-        })
-        const result = await chat.sendMessage(enrichedMessage)
-        const text = result.response.text()
+        // Resilient model fallback: gemini-3.5-flash -> gemini-3.8-flash -> gemini-flash-latest
+        const candidateModels = ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest']
+        let text = ''
+        let lastError = null
+
+        for (const modelName of candidateModels) {
+          try {
+            const model = genAI.getGenerativeModel({
+              model: modelName,
+              systemInstruction: SYSTEM_PROMPT,
+            })
+            const cleanHistory = sanitizeHistory(history)
+            const chat = model.startChat({ history: cleanHistory })
+            const result = await chat.sendMessage(enrichedMessage)
+            text = result.response.text()
+            if (text) break
+          } catch (mErr) {
+            lastError = mErr
+            console.warn(`[API_CHAT_FALLBACK] ${modelName} failed:`, mErr.message?.slice(0, 80))
+          }
+        }
+
+        if (!text && lastError) {
+          throw lastError
+        }
 
         res.writeHead(200, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ reply: text }))
