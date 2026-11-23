@@ -73,9 +73,10 @@ Open-Meteo API ──► AQI Data ──► Persona Engine ──► Vulnerabili
 ### Tech Stack
 | Layer | Technology |
 |-------|-----------|
-| Framework | React 18 + TypeScript (strict mode) |
-| Build | Vite 5 |
-| AI | Google Gemini API (`@google/generative-ai`) |
+| Frontend | React 18 + TypeScript (strict mode) |
+| Backend | Node.js lightweight HTTP API server (`server/index.js`) |
+| Build | Vite 5 (with `/api` dev proxy to port 3001) |
+| AI | Google Gemini API (`@google/generative-ai`) via server & client |
 | Air Quality | Open-Meteo Air Quality API (keyless, free) |
 | Validation | Zod (runtime schema validation on all API boundaries) |
 | Testing | Vitest + Testing Library (hermetic, zero real network calls) |
@@ -87,10 +88,10 @@ Open-Meteo API ──► AQI Data ──► Persona Engine ──► Vulnerabili
 ## Assumptions
 
 1. **Location**: Browser geolocation is used. If denied, defaults to New Delhi (28.6, 77.2) — one of the world's most affected cities by winter smog.
-2. **API Key**: Gemini API key is required via `VITE_GEMINI_API_KEY` env variable. The app works without it (AI chat disabled, all other features remain functional).
+2. **API Key**: Gemini API key is configured via `GEMINI_API_KEY` (server-side) or `VITE_GEMINI_API_KEY` (client-side) env variables. The app works without it (AI chat shows helpful guidance, all other features remain fully functional).
 3. **Network**: Open-Meteo API is free and keyless; the app falls back to realistic mock data if offline.
 4. **Medical**: AeroVane provides educational guidance only — not medical advice. Users are always directed to consult healthcare professionals.
-5. **Single User**: The app is client-side only; no user data is persisted or transmitted beyond the two API calls.
+5. **Privacy**: No user telemetry or personal health data is saved to disk or transmitted to third parties.
 
 ---
 
@@ -106,26 +107,32 @@ npm install   # or pnpm install
 
 # Configure AI (optional — app works without it)
 cp .env.example .env.local
-# Edit .env.local and add your Gemini API key
+# Edit .env.local and add your Gemini API key:
+# GEMINI_API_KEY=your_key_here
+# VITE_GEMINI_API_KEY=your_key_here
 
-# Run dev server
+# Run backend API server (port 3001)
+npm run server
+
+# In a second terminal, run frontend dev server (port 5173)
 npm run dev
 
-# Run tests
-npm test
-
-# Build for production
+# Or build and run production full-stack server on port 3001
 npm run build
+npm start
+
+# Run hermetic test suite
+npm test
 ```
 
 ---
 
 ## Security
 
-- **No secrets in code**: API key is loaded only from `VITE_GEMINI_API_KEY` environment variable
-- `.env` and `.env.local` are in `.gitignore` — never committed
-- All API responses validated with Zod schemas before use
-- No user data stored; no backend; no authentication required
+- **Server-side isolation**: Gemini API key can reside purely on the backend server (`GEMINI_API_KEY`), never exposed to the client bundle.
+- **No secrets in code**: `.env` and `.env.local` are in `.gitignore` — never committed to git.
+- **Strict runtime validation**: All API responses are validated with Zod schemas before consumption.
+- **CORS & Least Privilege**: Controlled endpoint routing on `/api/health`, `/api/air-quality`, and `/api/chat`.
 
 ---
 

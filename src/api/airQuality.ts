@@ -32,16 +32,27 @@ export async function fetchAirQuality(
   lat: number,
   lon: number
 ): Promise<AqiReading[]> {
-  const url = `${BASE_URL}?latitude=${lat}&longitude=${lon}&hourly=${HOURLY_VARS}&timezone=auto&forecast_days=7`
+  const backendUrl = `/api/air-quality?lat=${lat}&lon=${lon}`
+  const directUrl = `${BASE_URL}?latitude=${lat}&longitude=${lon}&hourly=${HOURLY_VARS}&timezone=auto&forecast_days=7`
 
   let raw: unknown
+  // 1. Try backend API proxy first
   try {
-    const res = await fetch(url)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    raw = await res.json()
+    const res = await fetch(backendUrl)
+    if (res.ok) raw = await res.json()
   } catch {
-    // Network unavailable — return hermetic mock data
-    return generateMockReadings(lat, lon)
+    // Backend offline — proceed to direct external API
+  }
+
+  // 2. Direct Open-Meteo API fallback
+  if (!raw) {
+    try {
+      const res = await fetch(directUrl)
+      if (res.ok) raw = await res.json()
+    } catch {
+      // Network unavailable — return hermetic mock data
+      return generateMockReadings(lat, lon)
+    }
   }
 
   const parsed = AirQualityResponseSchema.safeParse(raw)

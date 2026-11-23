@@ -64,6 +64,28 @@ export class AirQualityAdvisor {
     personaScore: PersonaScore,
     history: { role: 'user' | 'model'; parts: { text: string }[] }[]
   ): Promise<string> {
+    // 1. First attempt backend proxy (/api/chat) for maximum security
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userMessage,
+          currentReading,
+          persona,
+          personaScore,
+          history,
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.reply) return data.reply
+      }
+    } catch {
+      // Backend not running — fallback to client-side direct SDK
+    }
+
+    // 2. Direct client-side SDK fallback
     if (!this.isAvailable) {
       return 'AI advisor is not configured. Please add your Gemini API key to the .env file to enable personalized guidance.'
     }
