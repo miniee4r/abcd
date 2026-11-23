@@ -158,7 +158,28 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
-  // 4. Static files serving (if dist exists for production)
+  // 4. Geocoding proxy (Open-Meteo worldwide search)
+  if (pathname === '/api/geocoding') {
+    const name = parsedUrl.searchParams.get('name') || ''
+    if (!name.trim()) {
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ results: [] }))
+      return
+    }
+    try {
+      const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name.trim())}&count=6&language=en&format=json`
+      const response = await fetch(geoUrl)
+      const data = await response.json()
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify(data))
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ results: [], error: err.message }))
+    }
+    return
+  }
+
+  // 5. Static files serving (if dist exists for production)
   const distDir = path.join(ROOT_DIR, 'dist')
   if (fs.existsSync(distDir)) {
     let filePath = path.join(distDir, pathname === '/' ? 'index.html' : pathname)

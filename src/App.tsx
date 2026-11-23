@@ -19,7 +19,7 @@ export default function App() {
   const [persona, setPersona] = useState<FamilyPersona>(DEFAULT_PERSONA)
   const [activeTab, setActiveTab] = useState<Tab>('dashboard')
   const [loading, setLoading] = useState(true)
-  const [location, setLocation] = useState({ lat: 28.6, lon: 77.2, name: 'Detecting...' })
+  const [location, setLocation] = useState({ lat: 28.6139, lon: 77.2090, name: 'New Delhi, India' })
 
   const personaScore = scorePersona(persona)
   const routine = readings.length > 0 ? buildDailyRoutine(readings, personaScore) : null
@@ -31,13 +31,27 @@ export default function App() {
   const loadData = useCallback(async () => {
     setLoading(true)
     const coords = await getCurrentCoords()
-    setLocation({ lat: coords.lat, lon: coords.lon, name: `${coords.lat.toFixed(2)}, ${coords.lon.toFixed(2)}` })
+    setLocation({ lat: coords.lat, lon: coords.lon, name: `GPS: ${coords.lat.toFixed(2)}, ${coords.lon.toFixed(2)}` })
     const data = await fetchAirQuality(coords.lat, coords.lon)
     setReadings(data)
     setLoading(false)
   }, [])
 
-  useEffect(() => { loadData() }, [loadData])
+  const selectLocation = useCallback(async (loc: { name: string; lat: number; lon: number }) => {
+    setLoading(true)
+    setLocation({ lat: loc.lat, lon: loc.lon, name: loc.name })
+    const data = await fetchAirQuality(loc.lat, loc.lon)
+    setReadings(data)
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    // Initial fetch with default location
+    fetchAirQuality(location.lat, location.lon).then((data) => {
+      setReadings(data)
+      setLoading(false)
+    })
+  }, [])
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'dashboard', label: 'Air Quality' },
@@ -49,7 +63,13 @@ export default function App() {
 
   return (
     <div className="app">
-      <Header location={location.name} onRefresh={loadData} loading={loading} />
+      <Header
+        location={location.name}
+        onRefresh={() => selectLocation(location)}
+        onSelectCity={selectLocation}
+        onUseGps={loadData}
+        loading={loading}
+      />
       <main className="main-content" role="main">
         <PersonaSetup persona={persona} onChange={setPersona} score={personaScore} />
 

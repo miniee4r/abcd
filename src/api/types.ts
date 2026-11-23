@@ -92,3 +92,11 @@ export interface ImpactMetrics {
   healthRiskDeltaPercent: number
   activitiesOptimized: number
 }
+
+export interface CityLocation {
+  name: string
+  country: string
+  admin1?: string
+  lat: number
+  lon: number
+}

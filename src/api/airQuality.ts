@@ -103,13 +103,74 @@ export function generateMockReadings(lat: number, _lon: number): AqiReading[] {
 export function getCurrentCoords(): Promise<{ lat: number; lon: number }> {
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
-      resolve({ lat: 28.6, lon: 77.2 }) // Default: New Delhi
+      resolve({ lat: 28.6139, lon: 77.2090 }) // Default: New Delhi
       return
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
-      () => resolve({ lat: 28.6, lon: 77.2 }),
+      () => resolve({ lat: 28.6139, lon: 77.2090 }),
       { timeout: 5000 }
     )
   })
+}
+
+// ─── Popular global cities with worldwide coverage ───────────────────────────
+export const POPULAR_CITIES = [
+  { name: 'New Delhi', country: 'India', lat: 28.6139, lon: 77.2090 },
+  { name: 'Lahore', country: 'Pakistan', lat: 31.5204, lon: 74.3587 },
+  { name: 'Beijing', country: 'China', lat: 39.9042, lon: 116.4074 },
+  { name: 'New York', country: 'USA', lat: 40.7128, lon: -74.0060 },
+  { name: 'London', country: 'UK', lat: 51.5074, lon: -0.1278 },
+  { name: 'Tokyo', country: 'Japan', lat: 35.6762, lon: 139.6503 },
+  { name: 'Cairo', country: 'Egypt', lat: 30.0444, lon: 31.2357 },
+  { name: 'São Paulo', country: 'Brazil', lat: -23.5505, lon: -46.6333 },
+]
+
+// ─── Worldwide City Search & Geocoding — Open-Meteo ──────────────────────────
+export async function searchGlobalCities(query: string): Promise<Array<{
+  name: string
+  country: string
+  admin1?: string
+  lat: number
+  lon: number
+}>> {
+  const trimmed = query.trim()
+  if (!trimmed || trimmed.length < 2) return []
+
+  // 1. Try backend proxy
+  try {
+    const res = await fetch(`/api/geocoding?name=${encodeURIComponent(trimmed)}`)
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data.results)) {
+        return data.results.map((r: { name: string; country?: string; admin1?: string; latitude: number; longitude: number }) => ({
+          name: r.name,
+          country: r.country || '',
+          admin1: r.admin1 || '',
+          lat: r.latitude,
+          lon: r.longitude,
+        }))
+      }
+    }
+  } catch {
+    // fallback
+  }
+
+  // 2. Direct Open-Meteo Geocoding
+  try {
+    const directUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(trimmed)}&count=6&language=en&format=json`
+    const res = await fetch(directUrl)
+    if (!res.ok) return []
+    const data = await res.json()
+    if (!Array.isArray(data.results)) return []
+    return data.results.map((r: { name: string; country?: string; admin1?: string; latitude: number; longitude: number }) => ({
+      name: r.name,
+      country: r.country || '',
+      admin1: r.admin1 || '',
+      lat: r.latitude,
+      lon: r.longitude,
+    }))
+  } catch {
+    return []
+  }
 }
