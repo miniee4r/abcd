@@ -47,21 +47,38 @@ export default function AdvisorChat({ currentReading, persona, personaScore }: P
 
   async function sendMessage(text: string) {
     if (!text.trim() || loading) return
+    const trimmed = text.trim()
     setInput('')
-    const userMsg: Message = { role: 'user', text: text.trim() }
+    const userMsg: Message = { role: 'user', text: trimmed }
     setMessages((prev) => [...prev, userMsg])
     setLoading(true)
 
-    // Build Gemini history from previous turns
-    const history = messages.map((m) => ({
-      role: m.role === 'user' ? 'user' as const : 'model' as const,
-      parts: [{ text: m.text }],
-    }))
+    // Build sanitized history for Gemini (strictly alternating user/model)
+    const history: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = []
+    for (const m of messages) {
+      const role = m.role === 'user' ? 'user' : 'model'
+      if (!m.text.trim()) continue
+      if (history.length === 0 && role !== 'user') continue
+      if (history.length > 0 && history[history.length - 1].role === role) continue
+      history.push({ role, parts: [{ text: m.text.trim() }] })
+    }
+    if (history.length > 0 && history[history.length - 1].role === 'user') {
+      history.pop()
+    }
 
-    const reply = await advisor.chat(text.trim(), currentReading, persona, personaScore, history)
-    setMessages((prev) => [...prev, { role: 'assistant', text: reply }])
-    setLoading(false)
-    inputRef.current?.focus()
+    try {
+      const reply = await advisor.chat(trimmed, currentReading, persona, personaScore, history)
+      setMessages((prev) => [...prev, { role: 'assistant', text: reply }])
+    } catch (err) {
+      console.error('[AdvisorChat Error]', err)
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', text: 'I encountered an issue processing your request. Please try asking again.' },
+      ])
+    } finally {
+      setLoading(false)
+      inputRef.current?.focus()
+    }
   }
 
   function handleKey(e: React.KeyboardEvent<HTMLInputElement>) {

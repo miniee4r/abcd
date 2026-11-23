@@ -47,6 +47,24 @@ Safety rules:
 - Base advice on EPA, WHO, and established air quality science.
 - Be concise (3–5 sentences per response).`
 
+// ─── Sanitize chat history for Gemini (strict user/model alternation) ─────────
+function sanitizeHistory(history) {
+  if (!Array.isArray(history) || history.length === 0) return []
+  const clean = []
+  for (const item of history) {
+    const role = item.role === 'user' ? 'user' : 'model'
+    const text = item.parts?.[0]?.text?.trim()
+    if (!text) continue
+    if (clean.length === 0 && role !== 'user') continue
+    if (clean.length > 0 && clean[clean.length - 1].role === role) continue
+    clean.push({ role, parts: [{ text }] })
+  }
+  if (clean.length > 0 && clean[clean.length - 1].role === 'user') {
+    clean.pop()
+  }
+  return clean
+}
+
 // ─── Static file mime types for production serving ───────────────────────────
 const MIME_TYPES = {
   '.html': 'text/html',
@@ -139,8 +157,9 @@ const server = http.createServer(async (req, res) => {
         const context = `Conditions: ${category}. Risks: ${risks}. Housing: ${housing}. Vulnerability: ${personaScore?.riskLevel || 'moderate'}.`
         const enrichedMessage = `${context}\n\nUser question: ${message}`
 
+        const cleanHistory = sanitizeHistory(history)
         const chat = model.startChat({
-          history: Array.isArray(history) ? history : [],
+          history: cleanHistory,
         })
         const result = await chat.sendMessage(enrichedMessage)
         const text = result.response.text()
@@ -148,9 +167,10 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ reply: text }))
       } catch (err) {
+        console.error('[API_CHAT_EXCEPTION]', err)
         res.writeHead(500, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({
-          error: 'Failed to process AI chat',
+          error: err.message || 'Failed to process AI chat',
           reply: 'Unable to reach the AI advisor right now. Please try again in a moment.',
         }))
       }

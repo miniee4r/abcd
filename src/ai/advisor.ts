@@ -80,14 +80,17 @@ export class AirQualityAdvisor {
       if (res.ok) {
         const data = await res.json()
         if (data.reply) return data.reply
+      } else {
+        const data = await res.json().catch(() => ({}))
+        console.warn('[Advisor] Backend response not ok:', res.status, data)
       }
-    } catch {
-      // Backend not running — fallback to client-side direct SDK
+    } catch (err) {
+      console.warn('[Advisor] Backend unreachable, trying direct SDK:', err)
     }
 
     // 2. Direct client-side SDK fallback
     if (!this.isAvailable) {
-      return 'AI advisor is not configured. Please add your Gemini API key to the .env file to enable personalized guidance.'
+      return 'AeroVane AI is initializing. Please verify your connection or try again in a few seconds.'
     }
 
     try {
